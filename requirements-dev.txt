@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Test tooling is intentionally excluded from the production deployment.
+pytest==8.3.5
+pytest-cov==6.1.1
