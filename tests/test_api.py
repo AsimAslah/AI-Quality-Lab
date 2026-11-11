@@ -99,6 +99,28 @@ def test_event_and_run_isolation_between_browser_owners(client):
         assert stranger.get("/api/evaluations").json()["total"] == 0
 
 
+def test_workspace_key_allows_authorized_access_from_another_device(client):
+    workspace_key = "aql_test_workspace_key_12345678901234567890"
+    response = client.post(
+        "/api/evaluations",
+        json=payload(),
+        headers={"Idempotency-Key": str(uuid.uuid4()), "X-Workspace-Key": workspace_key},
+    )
+    run_id = response.json()["run"]["id"]
+    with TestClient(app) as authorized_device:
+        restored = authorized_device.get(
+            f"/api/evaluations/{run_id}", headers={"X-Workspace-Key": workspace_key}
+        )
+        assert restored.status_code == 200
+        assert restored.json()["title"] == payload()["title"]
+
+
+def test_invalid_workspace_key_is_rejected(client):
+    response = client.get("/api/dashboard", headers={"X-Workspace-Key": "too-short"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid workspace access key"
+
+
 def test_privacy_event_contains_category_but_not_raw_sensitive_value(client):
     sensitive = "Contact person@example.com and token sk-supersecret123456789."
     run_id = create(client, payload(response=sensitive)).json()["run"]["id"]
@@ -133,6 +155,36 @@ def test_provider_timeout_retries_and_recovers_with_deterministic_fallback(clien
     assert any(event["status"] == "recovered" for event in ai_events)
     assert detail["report"]["model_evaluation"] is None
     assert "deterministic fallback" in " ".join(detail["report"]["limitations"])
+
+
+def test_database_write_failure_preserves_input_and_never_claims_completion(client, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "enable_failure_testing", True)
+    body = payload(preferences={"use_ai": False, "redact_before_ai": True, "failure_mode": "database_error"})
+    run_id = create(client, body).json()["run"]["id"]
+    detail = client.get(f"/api/evaluations/{run_id}").json()
+    events = client.get(f"/api/evaluations/{run_id}/events").json()["items"]
+    report_events = [event for event in events if event["stage_id"] == "persist_report"]
+    assert detail["status"] == "failed"
+    assert detail["report"] is None
+    assert detail["prompt"] == body["prompt"]
+    assert any(event["status"] == "failed" for event in report_events)
+    assert not any(event["event_type"] == "stage.completed" for event in report_events)
+
+
+def test_sse_resume_uses_last_event_id_without_replaying_old_events(client):
+    run_id = create(client).json()["run"]["id"]
+    events = client.get(f"/api/evaluations/{run_id}/events").json()["items"]
+    checkpoint = events[7]["sequence"]
+    response = client.get(
+        f"/api/evaluations/{run_id}/stream?after=0",
+        headers={"Last-Event-ID": str(checkpoint)},
+    )
+    ids = [int(line.removeprefix("id: ")) for line in response.text.splitlines() if line.startswith("id: ")]
+    assert response.status_code == 200
+    assert ids
+    assert all(event_id > checkpoint for event_id in ids)
+    assert "event: complete" in response.text
 
 
 def test_health_checks_database(client):

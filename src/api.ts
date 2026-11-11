@@ -1,4 +1,5 @@
 import type { ExecutionEvent, RunDetail, RunSummary } from './types'
+import { getWorkspaceKey } from './workspace'
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public details?: unknown) {
@@ -10,7 +11,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'Content-Type': 'application/json', 'X-Workspace-Key': getWorkspaceKey(), ...(init?.headers ?? {}) },
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new ApiError(data.detail ?? 'Request failed', response.status, data.errors)
