@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Local data and secrets
+.env
+data/
+*.db
+*.sqlite*
+
+# Node / build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Replit local state
+.replit.nix
