@@ -164,10 +164,19 @@ def get_events(run_id: str, request: Request, db: Session = Depends(get_db)) -> 
 
 @router.get("/evaluations/{run_id}/stream")
 def stream_events(
-    run_id: str, request: Request, after: int = Query(default=0, ge=0), db: Session = Depends(get_db)
+    run_id: str,
+    request: Request,
+    after: int = Query(default=0, ge=0),
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    db: Session = Depends(get_db),
 ) -> StreamingResponse:
     owner = require_owner(request)
     owned_run(db, owner, run_id)
+    if last_event_id:
+        try:
+            after = max(after, int(last_event_id))
+        except ValueError:
+            pass
 
     def generate():
         sequence = after

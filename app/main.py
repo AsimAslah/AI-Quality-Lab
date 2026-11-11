@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,8 +45,12 @@ app = FastAPI(
 
 @app.middleware("http")
 async def session_and_security(request: Request, call_next):
-    token = request.cookies.get(settings.cookie_name)
-    created = False
+    workspace_key = request.headers.get("X-Workspace-Key")
+    if workspace_key and not re.fullmatch(r"[A-Za-z0-9_-]{24,160}", workspace_key):
+        return JSONResponse(status_code=400, content={"detail": "Invalid workspace access key"})
+    cookie_token = request.cookies.get(settings.cookie_name)
+    token = workspace_key or cookie_token
+    created = bool(workspace_key and workspace_key != cookie_token)
     if not token or len(token) < 24:
         token = new_owner_token()
         created = True
@@ -60,6 +65,11 @@ async def session_and_security(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
     return response
 
 
