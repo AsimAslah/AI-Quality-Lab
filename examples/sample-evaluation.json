@@ -1,0 +1,52 @@
+{
+  "title": "Autumn leaf color explainer",
+  "prompt": "Explain why leaves change color in autumn in a clear answer for a middle-school student.",
+  "response": "As autumn days become shorter and cooler, many trees stop making chlorophyll, the green pigment used in photosynthesis. When the chlorophyll breaks down, yellow and orange pigments that were already in the leaves become visible. Some trees also produce red pigments from sugars trapped in their leaves. Weather and tree species affect how bright the colors appear.",
+  "reference": "A strong answer should explain that reduced daylight and cooler temperatures slow chlorophyll production, exposing yellow and orange carotenoid pigments. It may also mention red anthocyanin production and variation caused by weather or species.",
+  "rubric": [
+    {
+      "id": "chlorophyll",
+      "name": "Chlorophyll explanation",
+      "description": "Explain that chlorophyll production slows and the green pigment breaks down.",
+      "weight": 10,
+      "mode": "keywords",
+      "required_phrases": [
+        "chlorophyll",
+        "breaks down"
+      ]
+    },
+    {
+      "id": "pigments",
+      "name": "Color pigments",
+      "description": "Identify the pigments responsible for yellow, orange, or red colors.",
+      "weight": 8,
+      "mode": "keywords",
+      "required_phrases": [
+        "yellow",
+        "orange",
+        "red"
+      ]
+    },
+    {
+      "id": "audience",
+      "name": "Audience fit",
+      "description": "Use clear language suitable for a middle-school student.",
+      "weight": 6,
+      "mode": "instruction",
+      "required_phrases": []
+    },
+    {
+      "id": "reference",
+      "name": "Reference coverage",
+      "description": "Cover the important scientific points in the reference answer.",
+      "weight": 7,
+      "mode": "reference",
+      "required_phrases": []
+    }
+  ],
+  "preferences": {
+    "use_ai": false,
+    "redact_before_ai": true,
+    "failure_mode": "none"
+  }
+}
