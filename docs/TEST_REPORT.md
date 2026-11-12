@@ -12,14 +12,14 @@ The locally verifiable release gates pass. No public Replit deployment or Replit
 
 | Check | Result | Evidence |
 |---|---|---|
-| Backend tests | PASS | 12 tests, 83% application statement coverage |
+| Backend tests | PASS | 16 tests, 87% application statement coverage |
 | TypeScript | PASS | `npm run typecheck` |
-| Frontend tests | PASS | Vitest graph reconstruction test |
+| Frontend tests | PASS | 5 Vitest replay and workspace-access tests |
 | Production bundle | PASS | `npm run build` |
 | Dependency audit | PASS | `npm audit`: 0 known vulnerabilities |
 | Python compilation | PASS | `python -m compileall app` |
 
-Backend coverage summary: **725 statements, 124 missed, 83%**.
+Backend coverage summary: **744 statements, 100 missed, 87%**.
 
 ## Backend behaviors verified
 
@@ -27,13 +27,16 @@ Backend coverage summary: **725 statements, 124 missed, 83%**.
 - Blank response returns structured 422 field feedback and creates no run.
 - Submission content survives processing and is returned only to its owner.
 - A second owner cannot access the run or its events (404).
+- An explicitly shared workspace key restores the same run on another client, while malformed keys are rejected.
 - The same owner/idempotency key returns one original run without re-execution.
 - All eight stages appear in the event log.
 - Event sequences are increasing and unique within the run.
+- SSE resume honors `Last-Event-ID` without replaying older events.
 - Completed stage durations are measured, present, and non-negative.
 - Dashboard/history restore saved state.
 - Potential email and key categories are recorded while raw matched values stay out of event logs.
 - Controlled provider timeout produces a retry, then a recovered deterministic fallback and reduced capability statement.
+- A controlled final database-write failure preserves the submission and never claims report completion.
 - Weighted aggregation honors criterion weights.
 - Reference comparison is labeled heuristic with a non-proof limitation.
 - Error redaction removes API-key values and database URLs.
@@ -42,6 +45,8 @@ Backend coverage summary: **725 statements, 124 missed, 83%**.
 ## Real-server production smoke test
 
 FastAPI was started with production settings on `127.0.0.1:5010`, serving the compiled `dist/` bundle.
+
+The health, frontend, secure-cookie, and security-header checks were repeated after the final FastAPI/Starlette security-pin upgrade.
 
 | Observation | Result |
 |---|---|

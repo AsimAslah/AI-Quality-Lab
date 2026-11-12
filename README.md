@@ -22,7 +22,7 @@ It deliberately does **not** claim that lexical heuristics prove factual accurac
 - Eight-stage live React Flow diagram driven by persisted backend SSE events
 - Authentic server timestamps and monotonic execution durations
 - Stage inspector with safely summarized metadata, errors, retries, and recovery
-- Persistent evaluation history and browser-session ownership isolation
+- Persistent evaluation history, browser-session ownership isolation, and explicit cross-device recovery keys
 - Replay with Play, Pause, Restart, and 0.5×–4× visualization speed
 - JSON and Markdown report exports
 - Idempotency protection, validation, rate limiting, redacted errors, and security headers
@@ -33,7 +33,7 @@ It deliberately does **not** claim that lexical heuristics prove factual accurac
 
 ```mermaid
 flowchart LR
-  B[React + TypeScript] -->|REST, HTTP-only owner cookie| A[FastAPI]
+  B[React + TypeScript] -->|REST, HTTP-only owner cookie or imported access key| A[FastAPI]
   A -->|SSE, sequence-aware resume| B
   A --> W[Evaluation pipeline]
   W --> P[PII pattern scanner]
@@ -110,7 +110,7 @@ npm run build
 npm audit
 ```
 
-The backend suite verifies valid/invalid requests, durable restoration, ordered real events, event/run isolation, authentic durations, idempotency, redaction, weighted scoring, retry/fallback, and database health. The frontend suite verifies replay graph reconstruction; the TypeScript build protects component/API contracts.
+The backend suite verifies valid/invalid requests, durable restoration, ordered real events, event/run isolation, cross-device authorization, authentic durations, idempotency, redaction, weighted scoring, retry/fallback, and database health. The frontend suite verifies replay graph reconstruction and workspace-key handling; the TypeScript build protects component/API contracts.
 
 See [docs/TEST_REPORT.md](docs/TEST_REPORT.md) for the recorded release verification.
 
@@ -123,6 +123,10 @@ The browser first loads stored events, then opens an SSE stream using the last k
 ## How replay works
 
 Replay loads the original persisted event list and progressively reveals those events in sequence. Play, Pause, Restart, and speed affect only presentation. Original timestamps and `duration_ms` remain unchanged and visible in the stage inspector.
+
+## Workspace access
+
+Records are scoped to a random owner token stored in an HTTP-only cookie. Opening **Workspace access** deliberately reveals that opaque token so it can be copied to another trusted device. Importing the key stores it locally on that device, sends it only to this app, and establishes the same HTTP-only cookie there. The access response is marked `no-store`, invalid key formats are rejected, and a device that has not imported a key continues using its existing cookie so upgrades do not hide prior history.
 
 ## Failure handling
 
@@ -148,11 +152,11 @@ Publishing has **not** been claimed complete until a live URL is manually verifi
 
 ## Privacy notice
 
-The server stores prompts, candidate responses, optional references, rubric definitions, reports, and redacted execution metadata for the owning browser session. Clearing that cookie loses access to anonymous records. Pattern detection can produce false positives and is not a substitute for a privacy review. External model processing is optional, redacted by default, and blocked when potential PII exists unless the server operator explicitly changes the policy.
+The server stores prompts, candidate responses, optional references, rubric definitions, reports, and redacted execution metadata for the owning workspace. Clearing the owner cookie loses access unless its workspace key was saved on another trusted device. Treat that key like a password: anyone who has it can read the workspace records. Pattern detection can produce false positives and is not a substitute for a privacy review. External model processing is optional, redacted by default, and blocked when potential PII exists unless the server operator explicitly changes the policy.
 
 ## Limitations
 
-- Anonymous browser ownership is a smooth public-demo access control, not recoverable account authentication.
+- Anonymous workspace keys provide simple demo recovery, not user identity, revocation, or multi-user account authentication.
 - Per-process rate limits are not global across multiple autoscaled instances.
 - SQLite is for local development only.
 - Subjective criteria remain heuristic without an optional provider and are still judgments when a provider is used.

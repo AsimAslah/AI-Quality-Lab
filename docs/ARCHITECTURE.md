@@ -6,7 +6,7 @@ AI Quality Lab is a single deployable application: a Vite/React/TypeScript clien
 
 ```mermaid
 flowchart LR
-  B[React browser] -->|REST + ownership cookie| A[FastAPI]
+  B[React browser] -->|REST + ownership cookie or imported key| A[FastAPI]
   A -->|SSE ordered events| B
   A --> E[Evaluation engine]
   E --> P[PII scanner]
@@ -29,7 +29,7 @@ flowchart LR
 ### FastAPI API
 
 - Pydantic schemas provide request/response validation and size limits.
-- Middleware assigns an opaque random owner token in a secure/same-site/HTTP-only cookie and applies request IDs/security headers.
+- Middleware assigns an opaque random owner token in a secure/same-site/HTTP-only cookie. An explicitly imported workspace key can establish the same owner on another trusted device.
 - Routes always filter by the hash of the owner token.
 - Submission inserts a run transactionally and starts evaluation in a server background task.
 - SSE polls persisted events. PostgreSQL LISTEN/NOTIFY is intentionally avoided for portability; low-volume polling is reliable across reconnects and local SQLite.
@@ -60,6 +60,7 @@ flowchart LR
 - `GET /api/dashboard` — authorized aggregates/recent runs.
 - `GET /api/health` — liveness/readiness and database connectivity without secrets.
 - `GET /api/meta` — capability and limit metadata.
+- `GET /api/workspace-access` — explicitly reveal the current opaque access key with `Cache-Control: no-store`.
 
 ## Execution event schema
 
@@ -100,6 +101,7 @@ Provider work may additionally use `running → retrying → recovered → compl
 
 - Owner tokens contain 256 bits of randomness; only an HMAC hash is stored.
 - Cookies are HTTP-only, SameSite=Lax, and Secure in production.
+- Access keys are revealed only through the explicit workspace-access UI; imported values are format-validated and sent only to same-origin API requests.
 - ORM queries are parameterized and always ownership-scoped.
 - Input length and rubric count are bounded.
 - A token-bucket-style per-client limiter protects submission and read endpoints (per-process demo control).
@@ -118,5 +120,5 @@ The production image needs `DATABASE_URL`, `SESSION_SECRET`, and optional provid
 ## Tradeoffs
 
 - Polling SSE storage is less immediate than an in-memory broker but survives refresh/restart and avoids new infrastructure.
-- Anonymous ownership is frictionless for a public challenge demo but not account recovery. Adding OAuth/magic-link auth is the first production evolution.
+- Opaque workspace keys add simple cross-device recovery, but have no user identity, expiry, or revocation. OAuth or magic-link authentication remains the first production evolution.
 - A single process can run evaluations safely for demo traffic. A durable task queue is recommended for high volume or long model calls.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import threading
 import time
 from datetime import datetime
 
@@ -12,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import database_is_ready, get_db
+from app.database import SessionLocal, database_is_ready, get_db
 from app.models import EvaluationRun, ExecutionEvent
 from app.pipeline import STAGES, process_evaluation, seed_pending_events
 from app.schemas import DashboardOut, EvaluationCreate
@@ -77,6 +76,16 @@ def meta() -> dict:
             "failure_testing": settings.enable_failure_testing and settings.app_env == "development",
         },
     }
+
+
+@router.get("/workspace-access")
+def workspace_access(request: Request, response: Response) -> dict:
+    """Reveal the current opaque owner key only after an explicit UI action."""
+    token = getattr(request.state, "owner_token", None)
+    if not token:
+        raise HTTPException(status_code=401, detail="Session unavailable")
+    response.headers["Cache-Control"] = "no-store"
+    return {"key": token}
 
 
 @router.post("/evaluations")
@@ -164,16 +173,25 @@ def get_events(run_id: str, request: Request, db: Session = Depends(get_db)) -> 
 
 @router.get("/evaluations/{run_id}/stream")
 def stream_events(
-    run_id: str, request: Request, after: int = Query(default=0, ge=0), db: Session = Depends(get_db)
+    run_id: str,
+    request: Request,
+    after: int = Query(default=0, ge=0),
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
 ) -> StreamingResponse:
     owner = require_owner(request)
-    owned_run(db, owner, run_id)
+    with SessionLocal() as initial_db:
+        owned_run(initial_db, owner, run_id)
+    if last_event_id:
+        try:
+            after = max(after, int(last_event_id))
+        except ValueError:
+            pass
 
     def generate():
         sequence = after
         idle_ticks = 0
         while True:
-            with next(get_db()) as stream_db:
+            with SessionLocal() as stream_db:
                 still_owned = stream_db.scalar(
                     select(EvaluationRun).where(EvaluationRun.id == run_id, EvaluationRun.owner_hash == owner)
                 )
@@ -188,9 +206,13 @@ def stream_events(
                 for event in events:
                     sequence = event.sequence
                     yield f"id: {event.sequence}\nevent: execution\ndata: {json.dumps(event_dict(event))}\n\n"
-                terminal = still_owned.status in {"completed", "completed_with_warnings", "failed"}
-            if terminal and not events:
-                yield f"event: complete\ndata: {json.dumps({'run_id': run_id, 'status': still_owned.status})}\n\n"
+                terminal_status = (
+                    still_owned.status
+                    if still_owned.status in {"completed", "completed_with_warnings", "failed"}
+                    else None
+                )
+            if terminal_status and not events:
+                yield f"event: complete\ndata: {json.dumps({'run_id': run_id, 'status': terminal_status})}\n\n"
                 return
             idle_ticks += 1
             if idle_ticks % 15 == 0:

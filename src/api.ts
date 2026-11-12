@@ -1,4 +1,5 @@
 import type { ExecutionEvent, RunDetail, RunSummary } from './types'
+import { getWorkspaceKey } from './workspace'
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public details?: unknown) {
@@ -7,10 +8,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  const workspaceKey = getWorkspaceKey()
+  if (workspaceKey) headers.set('X-Workspace-Key', workspaceKey)
   const response = await fetch(url, {
     ...init,
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers,
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new ApiError(data.detail ?? 'Request failed', response.status, data.errors)
@@ -18,6 +23,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  workspaceAccess: () => request<{ key: string }>('/api/workspace-access'),
   dashboard: () => request<{ total_runs: number; completed_runs: number; average_score: number | null; privacy_warnings: number; recent: RunSummary[] }>('/api/dashboard'),
   listRuns: () => request<{ items: RunSummary[]; total: number }>('/api/evaluations'),
   getRun: (id: string) => request<RunDetail>(`/api/evaluations/${id}`),
