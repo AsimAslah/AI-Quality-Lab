@@ -3,7 +3,7 @@ onBoot = "python -m pip install -r requirements.txt && npm ci"
 run = "npm run build && python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"
 
 [deployment]
-build = "python -m pip install -r requirements.txt && npm ci && npm run build"
+build = "npm ci && npm run build"
 run = "python -m uvicorn app.main:app --host 0.0.0.0 --port 5000"
 deploymentTarget = "cloudrun"
 
